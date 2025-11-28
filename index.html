@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="学生学习规划与评价生成器 - 纯前端工具，帮助生成个性化学习规划">
+    <title>学生学习规划与评价生成器</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 输入页面 -->
+    <div id="inputPage" class="page active">
+        <div class="container">
+            <header class="page-header">
+                <h1>学生学习规划与评价生成器</h1>
+                <p class="subtitle">输入学生信息，一键生成个性化学习规划</p>
+            </header>
+
+            <form id="studentForm" class="form-container">
+                <!-- 学生姓名 -->
+                <div class="form-group">
+                    <label for="studentName" class="form-label">
+                        学生姓名 <span class="required">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="studentName"
+                        class="form-input"
+                        placeholder="请输入学生姓名（1-20个字符）"
+                        maxlength="20"
+                        required
+                    >
+                    <span class="form-hint">请输入1-20个字符</span>
+                </div>
+
+                <!-- 学习科目 -->
+                <div class="form-group">
+                    <label for="subject" class="form-label">
+                        学习科目 <span class="required">*</span>
+                    </label>
+                    <select id="subject" class="form-select" required>
+                        <option value="">请选择科目</option>
+                        <option value="语文">语文</option>
+                        <option value="数学">数学</option>
+                        <option value="英语">英语</option>
+                        <option value="物理">物理</option>
+                        <option value="化学">化学</option>
+                        <option value="生物">生物</option>
+                        <option value="历史">历史</option>
+                        <option value="地理">地理</option>
+                        <option value="政治">政治</option>
+                        <option value="other">其他（自定义）</option>
+                    </select>
+                    <input
+                        type="text"
+                        id="customSubject"
+                        class="form-input"
+                        placeholder="请输入自定义科目"
+                        style="display: none; margin-top: 10px;"
+                    >
+                    <span class="form-hint">选择学生需要规划的科目</span>
+                </div>
+
+                <!-- 学习阶段 -->
+                <div class="form-group">
+                    <label for="stage" class="form-label">
+                        学习阶段 <span class="required">*</span>
+                    </label>
+                    <select id="stage" class="form-select" required>
+                        <option value="">请选择学习阶段</option>
+                        <option value="小学低年级">小学低年级（1-3年级）</option>
+                        <option value="小学高年级">小学高年级（4-6年级）</option>
+                        <option value="初中">初中</option>
+                        <option value="高中">高中</option>
+                    </select>
+                    <span class="form-hint">选择学生当前所在学习阶段</span>
+                </div>
+
+                <!-- 综合信息 -->
+                <div class="form-group">
+                    <label for="description" class="form-label">
+                        综合信息 <span class="required">*</span>
+                    </label>
+                    <textarea
+                        id="description"
+                        class="form-textarea"
+                        placeholder="请输入学生当前学习情况，如：数学基础薄弱，应用题丢分多；英语词汇量不足等（10-500字）"
+                        maxlength="500"
+                        rows="6"
+                        required
+                    ></textarea>
+                    <div class="char-count">
+                        <span id="charCount">0</span> / 500 字
+                    </div>
+                    <span class="form-hint">请详细描述学生的学习现状、优势和不足（至少10字）</span>
+                </div>
+
+                <!-- 按钮组 -->
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">
+                        <span class="btn-text">生成规划</span>
+                    </button>
+                    <button type="reset" class="btn btn-secondary">
+                        重置表单
+                    </button>
+                </div>
+            </form>
+
+            <footer class="page-footer">
+                <p>© 2024 学生学习规划生成器 - 开源工具 | 所有数据在本地处理，保护隐私</p>
+            </footer>
+        </div>
+    </div>
+
+    <!-- 结果页面 -->
+    <div id="resultPage" class="page">
+        <div class="container">
+            <!-- 顶部操作栏 -->
+            <div class="result-header">
+                <button id="backBtn" class="btn btn-back">
+                    ← 返回编辑
+                </button>
+                <div class="export-buttons">
+                    <button id="copyBtn" class="btn btn-export">
+                        📋 复制内容
+                    </button>
+                    <button id="saveBtn" class="btn btn-export">
+                        💾 保存为TXT
+                    </button>
+                    <button id="printBtn" class="btn btn-export">
+                        🖨️ 打印
+                    </button>
+                </div>
+            </div>
+
+            <!-- 结果内容 -->
+            <div id="resultContent" class="result-content">
+                <!-- 学习规划部分 -->
+                <section class="result-section">
+                    <h2 class="section-title">📚 学习规划</h2>
+                    <div id="planContent" class="section-content"></div>
+                </section>
+
+                <!-- 综合评价部分 -->
+                <section class="result-section">
+                    <h2 class="section-title">📝 综合评价</h2>
+                    <div id="evaluationContent" class="section-content"></div>
+                </section>
+            </div>
+
+            <footer class="page-footer">
+                <p>© 2024 学生学习规划生成器 - 开源工具</p>
+            </footer>
+        </div>
+    </div>
+
+    <!-- 加载动画 -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">正在生成学习规划...</p>
+    </div>
+
+    <!-- 提示消息 -->
+    <div id="toast" class="toast"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
