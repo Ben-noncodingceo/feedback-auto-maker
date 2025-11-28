@@ -549,6 +549,146 @@ body {
 }
 
 /* ============================================
+   文件上传模块样式
+   ============================================ */
+.upload-section {
+    background: #f8f9fa;
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-xl);
+    border: 2px dashed var(--primary-color);
+}
+
+.upload-section-title {
+    font-size: 18px;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-md);
+    font-weight: 600;
+}
+
+.section-divider {
+    border: none;
+    border-top: 2px solid var(--border-color);
+    margin: var(--spacing-xl) 0;
+}
+
+.file-upload-wrapper {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.file-input {
+    display: none;
+}
+
+.file-upload-btn {
+    display: inline-block;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background: var(--primary-color);
+    color: white;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: var(--transition);
+    border: none;
+}
+
+.file-upload-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.file-name {
+    color: var(--text-secondary);
+    font-size: 14px;
+    flex: 1;
+    min-width: 150px;
+}
+
+.btn-remove {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 13px;
+    transition: var(--transition);
+}
+
+.btn-remove:hover {
+    background: #c82333;
+}
+
+.file-preview {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: white;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+}
+
+.preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.toggle-preview {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 4px 8px;
+}
+
+.toggle-preview:hover {
+    background: #e3f2fd;
+    border-radius: var(--radius-sm);
+}
+
+.preview-content {
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    padding: var(--spacing-sm);
+    background: #fafafa;
+    border-radius: var(--radius-sm);
+}
+
+.preview-content.collapsed {
+    display: none;
+}
+
+.preview-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.preview-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.preview-content::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 4px;
+}
+
+.preview-content::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-hover);
+}
+
+/* ============================================
    打印样式
    ============================================ */
 @media print {

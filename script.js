@@ -8,6 +8,18 @@ let studentData = {
     description: ''
 };
 
+// 文件数据存储
+let syllabusData = {
+    fileName: '',
+    content: '',
+    chapters: [] // 解析后的章节信息
+};
+
+let bannedWordsData = {
+    fileName: '',
+    words: new Set() // 使用Set存储禁止词，便于快速查找
+};
+
 // ============================================
 // DOM 元素引用
 // ============================================
@@ -15,6 +27,20 @@ const elements = {
     // 页面
     inputPage: document.getElementById('inputPage'),
     resultPage: document.getElementById('resultPage'),
+
+    // 文件上传元素
+    syllabusFile: document.getElementById('syllabusFile'),
+    syllabusFileName: document.getElementById('syllabusFileName'),
+    removeSyllabusBtn: document.getElementById('removeSyllabusBtn'),
+    syllabusPreview: document.getElementById('syllabusPreview'),
+    syllabusContent: document.getElementById('syllabusContent'),
+
+    bannedWordsFile: document.getElementById('bannedWordsFile'),
+    bannedWordsFileName: document.getElementById('bannedWordsFileName'),
+    removeBannedWordsBtn: document.getElementById('removeBannedWordsBtn'),
+    bannedWordsPreview: document.getElementById('bannedWordsPreview'),
+    bannedWordsContent: document.getElementById('bannedWordsContent'),
+    bannedWordsCount: document.getElementById('bannedWordsCount'),
 
     // 表单元素
     form: document.getElementById('studentForm'),
@@ -28,7 +54,8 @@ const elements = {
     // 结果页面元素
     backBtn: document.getElementById('backBtn'),
     copyBtn: document.getElementById('copyBtn'),
-    saveBtn: document.getElementById('saveBtn'),
+    saveTxtBtn: document.getElementById('saveTxtBtn'),
+    saveDocxBtn: document.getElementById('saveDocxBtn'),
     printBtn: document.getElementById('printBtn'),
     planContent: document.getElementById('planContent'),
     evaluationContent: document.getElementById('evaluationContent'),
@@ -56,11 +83,203 @@ function initEventListeners() {
     // 字符计数
     elements.description.addEventListener('input', updateCharCount);
 
+    // 文件上传
+    elements.syllabusFile.addEventListener('change', handleSyllabusUpload);
+    elements.bannedWordsFile.addEventListener('change', handleBannedWordsUpload);
+    elements.removeSyllabusBtn.addEventListener('click', removeSyllabus);
+    elements.removeBannedWordsBtn.addEventListener('click', removeBannedWords);
+
     // 结果页面按钮
     elements.backBtn.addEventListener('click', () => switchPage('input'));
     elements.copyBtn.addEventListener('click', copyToClipboard);
-    elements.saveBtn.addEventListener('click', saveAsTxt);
+    elements.saveTxtBtn.addEventListener('click', saveAsTxt);
+    elements.saveDocxBtn.addEventListener('click', saveAsDocx);
     elements.printBtn.addEventListener('click', () => window.print());
+}
+
+// ============================================
+// 文件上传处理
+// ============================================
+async function handleSyllabusUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+        showLoading();
+        const fileName = file.name;
+        const fileExt = fileName.split('.').pop().toLowerCase();
+
+        let content = '';
+
+        if (fileExt === 'txt') {
+            content = await readTextFile(file);
+        } else if (fileExt === 'docx') {
+            content = await readDocxFile(file);
+        } else {
+            throw new Error('不支持的文件格式');
+        }
+
+        // 保存数据
+        syllabusData.fileName = fileName;
+        syllabusData.content = content;
+        syllabusData.chapters = parseSyllabus(content);
+
+        // 更新UI
+        elements.syllabusFileName.textContent = fileName;
+        elements.removeSyllabusBtn.style.display = 'inline-block';
+        elements.syllabusPreview.style.display = 'block';
+        elements.syllabusContent.textContent = content.substring(0, 500) + (content.length > 500 ? '...' : '');
+
+        hideLoading();
+        showToast(`课程大纲 "${fileName}" 上传成功！`, 'success');
+    } catch (error) {
+        hideLoading();
+        showToast('文件读取失败：' + error.message, 'error');
+        e.target.value = '';
+    }
+}
+
+async function handleBannedWordsUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+        showLoading();
+        const fileName = file.name;
+        const content = await readTextFile(file);
+
+        // 解析禁止词（按行分割，去除空行和空格）
+        const words = content
+            .split(/\r?\n/)
+            .map(word => word.trim())
+            .filter(word => word.length > 0);
+
+        // 保存数据
+        bannedWordsData.fileName = fileName;
+        bannedWordsData.words = new Set(words);
+
+        // 更新UI
+        elements.bannedWordsFileName.textContent = fileName;
+        elements.removeBannedWordsBtn.style.display = 'inline-block';
+        elements.bannedWordsPreview.style.display = 'block';
+        elements.bannedWordsCount.textContent = words.length;
+        elements.bannedWordsContent.textContent = words.join(', ');
+
+        hideLoading();
+        showToast(`禁止词库 "${fileName}" 上传成功！已加载 ${words.length} 个禁止词`, 'success');
+    } catch (error) {
+        hideLoading();
+        showToast('文件读取失败：' + error.message, 'error');
+        e.target.value = '';
+    }
+}
+
+function removeSyllabus() {
+    syllabusData = { fileName: '', content: '', chapters: [] };
+    elements.syllabusFile.value = '';
+    elements.syllabusFileName.textContent = '未选择文件';
+    elements.removeSyllabusBtn.style.display = 'none';
+    elements.syllabusPreview.style.display = 'none';
+    showToast('已移除课程大纲', 'success');
+}
+
+function removeBannedWords() {
+    bannedWordsData = { fileName: '', words: new Set() };
+    elements.bannedWordsFile.value = '';
+    elements.bannedWordsFileName.textContent = '未选择文件';
+    elements.removeBannedWordsBtn.style.display = 'none';
+    elements.bannedWordsPreview.style.display = 'none';
+    showToast('已移除禁止词库', 'success');
+}
+
+// ============================================
+// 文件读取函数
+// ============================================
+function readTextFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('文件读取失败'));
+        reader.readAsText(file, 'UTF-8');
+    });
+}
+
+async function readDocxFile(file) {
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        return result.value;
+    } catch (error) {
+        throw new Error('DOCX文件解析失败');
+    }
+}
+
+// ============================================
+// 课程大纲解析
+// ============================================
+function parseSyllabus(content) {
+    const chapters = [];
+    const lines = content.split(/\r?\n/).filter(line => line.trim());
+
+    // 简单的章节识别逻辑
+    // 识别包含"第...章"、"第...节"、"第...单元"、"Chapter"等的行作为章节标题
+    const chapterPatterns = [
+        /第[一二三四五六七八九十\d]+[章节课单元]/,
+        /Chapter\s*\d+/i,
+        /Unit\s*\d+/i,
+        /^\d+[\.、]\s*.+/,  // 数字开头的标题
+    ];
+
+    lines.forEach((line, index) => {
+        const trimmedLine = line.trim();
+
+        // 检查是否匹配章节模式
+        const isChapter = chapterPatterns.some(pattern => pattern.test(trimmedLine));
+
+        if (isChapter) {
+            chapters.push({
+                title: trimmedLine,
+                order: chapters.length + 1,
+                lineNumber: index
+            });
+        }
+    });
+
+    // 如果没有识别到章节，将整个内容按段落分割
+    if (chapters.length === 0) {
+        const paragraphs = content.split(/\n\n+/).filter(p => p.trim().length > 10);
+        paragraphs.forEach((para, index) => {
+            const title = para.split('\n')[0].trim();
+            if (title.length < 100) { // 只取较短的行作为标题
+                chapters.push({
+                    title: title,
+                    order: index + 1,
+                    lineNumber: index
+                });
+            }
+        });
+    }
+
+    return chapters;
+}
+
+// ============================================
+// 禁止词过滤
+// ============================================
+function filterBannedWords(text) {
+    if (bannedWordsData.words.size === 0) {
+        return text; // 没有禁止词，直接返回
+    }
+
+    let filteredText = text;
+
+    // 遍历所有禁止词，进行替换
+    bannedWordsData.words.forEach(word => {
+        const regex = new RegExp(word, 'g');
+        filteredText = filteredText.replace(regex, '*'.repeat(word.length));
+    });
+
+    return filteredText;
 }
 
 // ============================================
@@ -181,7 +400,7 @@ function updateCharCount() {
 }
 
 // ============================================
-// 学习规划生成
+// 学习规划生成（增强版 - 使用课程大纲）
 // ============================================
 function generateResults() {
     const plan = generateLearningPlan();
@@ -197,7 +416,7 @@ function generateLearningPlan() {
     // 生成学习目标
     const goals = generateGoals(subject, stage, description);
 
-    // 生成学习任务
+    // 生成学习任务（优先使用课程大纲）
     const tasks = generateTasks(subject, stage, description);
 
     // 生成课时预估
@@ -220,19 +439,86 @@ function generateShortTermGoal(subject, stage, description) {
     const weaknessKeywords = extractWeakness(description);
     const templates = getShortTermTemplates(subject, stage);
 
+    let goal = '';
     if (weaknessKeywords.length > 0) {
-        return `针对${weaknessKeywords.join('、')}等薄弱环节进行专项训练，${templates.specific}`;
+        goal = `针对${weaknessKeywords.join('、')}等薄弱环节进行专项训练，${templates.specific}`;
+    } else {
+        goal = templates.general;
     }
 
-    return templates.general;
+    return filterBannedWords(goal);
 }
 
 function generateLongTermGoal(subject, stage, description) {
     const templates = getLongTermTemplates(subject, stage);
-    return templates.general;
+    return filterBannedWords(templates.general);
 }
 
 function generateTasks(subject, stage, description) {
+    const weeks = [];
+
+    // 如果有课程大纲，优先使用大纲内容
+    if (syllabusData.chapters.length > 0) {
+        weeks.push(...generateTasksFromSyllabus(subject, stage));
+    } else {
+        // 使用默认模板
+        weeks.push(...generateDefaultTasks(subject, stage, description));
+    }
+
+    return weeks;
+}
+
+function generateTasksFromSyllabus(subject, stage) {
+    const weeks = [];
+    const chapters = syllabusData.chapters;
+    const chaptersPerWeek = Math.max(1, Math.ceil(chapters.length / 4));
+
+    // 将章节分配到4周
+    for (let weekNum = 1; weekNum <= 4; weekNum++) {
+        const startIdx = (weekNum - 1) * chaptersPerWeek;
+        const endIdx = Math.min(startIdx + chaptersPerWeek, chapters.length);
+        const weekChapters = chapters.slice(startIdx, endIdx);
+
+        const weekTasks = [];
+        const days = ['周一', '周二', '周三', '周四', '周五', '周六'];
+
+        weekChapters.forEach((chapter, idx) => {
+            if (idx < days.length) {
+                weekTasks.push({
+                    day: days[idx],
+                    content: filterBannedWords(`学习 ${chapter.title}`),
+                    time: '40'
+                });
+            }
+        });
+
+        // 补充练习和复习任务
+        if (weekTasks.length < 5) {
+            weekTasks.push({
+                day: days[weekTasks.length],
+                content: filterBannedWords(`本周知识点复习与巩固练习`),
+                time: '30'
+            });
+        }
+
+        if (weekTasks.length < 6) {
+            weekTasks.push({
+                day: days[weekTasks.length],
+                content: filterBannedWords(`周测验与错题整理`),
+                time: '35'
+            });
+        }
+
+        weeks.push({
+            week: weekNum,
+            tasks: weekTasks
+        });
+    }
+
+    return weeks;
+}
+
+function generateDefaultTasks(subject, stage, description) {
     const taskTemplates = getTaskTemplates(subject, stage);
     const weeks = [];
 
@@ -257,9 +543,11 @@ function generateWeekTasks(weekNumber, templates, description) {
 
     taskDays.forEach((day, index) => {
         const taskType = templates[index % templates.length];
+        const content = taskType.content.replace('{week}', weekNumber);
+
         tasks.push({
             day: day,
-            content: taskType.content.replace('{week}', weekNumber),
+            content: filterBannedWords(content),
             time: taskType.time
         });
     });
@@ -303,12 +591,13 @@ function getTaskType(content) {
     if (content.includes('复习') || content.includes('知识点')) return '知识点复习';
     if (content.includes('练习') || content.includes('专项')) return '专项练习';
     if (content.includes('错题') || content.includes('整理')) return '错题整理';
-    if (content.includes('测试') || content.includes('模拟')) return '模拟测试';
+    if (content.includes('测试') || content.includes('测验') || content.includes('模拟')) return '模拟测试';
+    if (content.includes('学习') || content.includes('章')) return '新知识学习';
     return '其他';
 }
 
 // ============================================
-// 评价生成
+// 评价生成（增强版 - 禁止词过滤）
 // ============================================
 function generateEvaluation() {
     const { description, subject, stage } = studentData;
@@ -325,7 +614,12 @@ function generateEvaluation() {
     // 鼓励性结语
     const encouragement = generateEncouragement();
 
-    return { strengths, weaknesses, improvements, encouragement };
+    return {
+        strengths: strengths.map(s => filterBannedWords(s)),
+        weaknesses: weaknesses.map(w => filterBannedWords(w)),
+        improvements: improvements.map(i => filterBannedWords(i)),
+        encouragement: filterBannedWords(encouragement)
+    };
 }
 
 function analyzeStrengths(description, subject) {
@@ -411,6 +705,11 @@ function generateImprovements(weaknesses, subject, stage) {
         }
     });
 
+    // 如果有课程大纲，添加相关建议
+    if (syllabusData.chapters.length > 0) {
+        improvements.push('按照课程大纲的章节顺序系统学习，确保知识体系的完整性');
+    }
+
     // 添加通用建议
     improvements.push('制定科学的学习计划，保证每天的学习时间和质量');
     improvements.push('建立错题本，定期复习错题，避免重复犯错');
@@ -440,7 +739,7 @@ function generateEncouragement() {
 }
 
 // ============================================
-// 辅助函数
+// 辅助函数（模板获取）
 // ============================================
 function extractWeakness(description) {
     const keywords = [];
@@ -595,6 +894,9 @@ function renderPlan(plan) {
 
         <div class="plan-section">
             <h3>学习任务安排</h3>
+            ${syllabusData.chapters.length > 0 ?
+                '<p style="color: #28a745; margin-bottom: 10px;"><strong>✓ 已根据上传的课程大纲生成学习任务</strong></p>' :
+                ''}
     `;
 
     // 渲染每周任务
@@ -688,6 +990,14 @@ function renderEvaluation(evaluation) {
         </div>
     `;
 
+    if (bannedWordsData.words.size > 0) {
+        html += `
+            <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 4px; font-size: 13px;">
+                <strong>提示：</strong>生成的内容已根据禁止词库过滤（共${bannedWordsData.words.size}个禁止词）
+            </div>
+        `;
+    }
+
     elements.evaluationContent.innerHTML = html;
 }
 
@@ -742,13 +1052,115 @@ function saveAsTxt() {
     link.click();
 
     URL.revokeObjectURL(url);
-    showToast('文件已开始下载！', 'success');
+    showToast('TXT文件已开始下载！', 'success');
+}
+
+async function saveAsDocx() {
+    try {
+        showLoading();
+
+        const date = new Date().toLocaleDateString('zh-CN');
+        const filename = `${studentData.name}-学习规划-${new Date().toISOString().split('T')[0]}.docx`;
+
+        // 使用docx库创建文档
+        const doc = new docx.Document({
+            sections: [{
+                properties: {},
+                children: [
+                    // 标题
+                    new docx.Paragraph({
+                        text: "学生学习规划与评价报告",
+                        heading: docx.HeadingLevel.HEADING_1,
+                        alignment: docx.AlignmentType.CENTER,
+                        spacing: { after: 200 }
+                    }),
+
+                    // 基本信息
+                    new docx.Paragraph({
+                        text: `学生姓名：${studentData.name}`,
+                        spacing: { after: 100 }
+                    }),
+                    new docx.Paragraph({
+                        text: `学习科目：${studentData.subject}`,
+                        spacing: { after: 100 }
+                    }),
+                    new docx.Paragraph({
+                        text: `学习阶段：${studentData.stage}`,
+                        spacing: { after: 100 }
+                    }),
+                    new docx.Paragraph({
+                        text: `生成日期：${date}`,
+                        spacing: { after: 300 }
+                    }),
+
+                    // 学习情况描述
+                    new docx.Paragraph({
+                        text: "学习情况描述",
+                        heading: docx.HeadingLevel.HEADING_2,
+                        spacing: { before: 200, after: 100 }
+                    }),
+                    new docx.Paragraph({
+                        text: studentData.description,
+                        spacing: { after: 300 }
+                    }),
+
+                    // 学习规划
+                    new docx.Paragraph({
+                        text: "📚 学习规划",
+                        heading: docx.HeadingLevel.HEADING_2,
+                        spacing: { before: 200, after: 100 }
+                    }),
+                    new docx.Paragraph({
+                        text: elements.planContent.innerText,
+                        spacing: { after: 300 }
+                    }),
+
+                    // 综合评价
+                    new docx.Paragraph({
+                        text: "📝 综合评价",
+                        heading: docx.HeadingLevel.HEADING_2,
+                        spacing: { before: 200, after: 100 }
+                    }),
+                    new docx.Paragraph({
+                        text: elements.evaluationContent.innerText,
+                        spacing: { after: 200 }
+                    }),
+
+                    // 页脚
+                    new docx.Paragraph({
+                        text: "© 2024 学生学习规划生成器",
+                        alignment: docx.AlignmentType.CENTER,
+                        spacing: { before: 400 }
+                    })
+                ]
+            }]
+        });
+
+        // 生成并下载
+        const blob = await docx.Packer.toBlob(doc);
+        saveAs(blob, filename);
+
+        hideLoading();
+        showToast('DOCX文件已开始下载！', 'success');
+    } catch (error) {
+        hideLoading();
+        showToast('DOCX生成失败：' + error.message, 'error');
+        console.error(error);
+    }
 }
 
 function generateExportText() {
     const date = new Date().toLocaleDateString('zh-CN');
     const planText = elements.planContent.innerText;
     const evaluationText = elements.evaluationContent.innerText;
+
+    let fileInfo = '';
+    if (syllabusData.fileName) {
+        fileInfo += `\n课程大纲：${syllabusData.fileName}`;
+    }
+    if (bannedWordsData.fileName) {
+        fileInfo += `\n禁止词库：${bannedWordsData.fileName}（${bannedWordsData.words.size}个禁止词）`;
+    }
 
     return `
 ====================================
@@ -758,7 +1170,7 @@ function generateExportText() {
 学生姓名：${studentData.name}
 学习科目：${studentData.subject}
 学习阶段：${studentData.stage}
-生成日期：${date}
+生成日期：${date}${fileInfo}
 
 ------------------------------------
 学习情况描述
@@ -817,7 +1229,15 @@ function toggleWeek(element) {
     element.classList.toggle('collapsed');
 }
 
+function togglePreview(contentId) {
+    const content = document.getElementById(contentId);
+    if (content) {
+        content.classList.toggle('collapsed');
+    }
+}
+
 // ============================================
 // 全局函数（供 HTML onclick 调用）
 // ============================================
 window.toggleWeek = toggleWeek;
+window.togglePreview = togglePreview;

@@ -4,8 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="学生学习规划与评价生成器 - 纯前端工具，帮助生成个性化学习规划">
-    <title>学生学习规划与评价生成器</title>
+    <title>学生学习规划与评价生成器 (增强版)</title>
     <link rel="stylesheet" href="style.css">
+    <!-- 引入 mammoth.js 用于解析 docx 文件 -->
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+    <!-- 引入 docx 库用于生成 docx 文件 -->
+    <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 </head>
 <body>
     <!-- 输入页面 -->
@@ -13,10 +18,81 @@
         <div class="container">
             <header class="page-header">
                 <h1>学生学习规划与评价生成器</h1>
-                <p class="subtitle">输入学生信息，一键生成个性化学习规划</p>
+                <p class="subtitle">上传课程大纲和禁止词库，输入学生信息，一键生成个性化学习规划</p>
             </header>
 
             <form id="studentForm" class="form-container">
+                <!-- 文件上传区域 -->
+                <div class="upload-section">
+                    <h3 class="upload-section-title">📁 文件上传（可选）</h3>
+
+                    <!-- 课程大纲上传 -->
+                    <div class="form-group">
+                        <label for="syllabusFile" class="form-label">
+                            课程大纲文件
+                        </label>
+                        <div class="file-upload-wrapper">
+                            <input
+                                type="file"
+                                id="syllabusFile"
+                                class="file-input"
+                                accept=".txt,.docx"
+                            >
+                            <label for="syllabusFile" class="file-upload-btn">
+                                📄 选择文件 (txt/docx)
+                            </label>
+                            <span id="syllabusFileName" class="file-name">未选择文件</span>
+                            <button type="button" id="removeSyllabusBtn" class="btn-remove" style="display: none;">
+                                ✕ 移除
+                            </button>
+                        </div>
+                        <div id="syllabusPreview" class="file-preview" style="display: none;">
+                            <div class="preview-header">
+                                <strong>文件内容预览：</strong>
+                                <button type="button" class="toggle-preview" onclick="togglePreview('syllabusContent')">
+                                    ▼ 展开/收起
+                                </button>
+                            </div>
+                            <div id="syllabusContent" class="preview-content collapsed"></div>
+                        </div>
+                        <span class="form-hint">上传课程大纲，生成的学习任务将参考大纲内容</span>
+                    </div>
+
+                    <!-- 禁止词库上传 -->
+                    <div class="form-group">
+                        <label for="bannedWordsFile" class="form-label">
+                            禁止词库文件
+                        </label>
+                        <div class="file-upload-wrapper">
+                            <input
+                                type="file"
+                                id="bannedWordsFile"
+                                class="file-input"
+                                accept=".txt"
+                            >
+                            <label for="bannedWordsFile" class="file-upload-btn">
+                                🚫 选择文件 (txt)
+                            </label>
+                            <span id="bannedWordsFileName" class="file-name">未选择文件</span>
+                            <button type="button" id="removeBannedWordsBtn" class="btn-remove" style="display: none;">
+                                ✕ 移除
+                            </button>
+                        </div>
+                        <div id="bannedWordsPreview" class="file-preview" style="display: none;">
+                            <div class="preview-header">
+                                <strong>已加载 <span id="bannedWordsCount">0</span> 个禁止词</strong>
+                                <button type="button" class="toggle-preview" onclick="togglePreview('bannedWordsContent')">
+                                    ▼ 展开/收起
+                                </button>
+                            </div>
+                            <div id="bannedWordsContent" class="preview-content collapsed"></div>
+                        </div>
+                        <span class="form-hint">上传禁止词库（每行一个词），生成的内容将自动过滤这些词汇</span>
+                    </div>
+                </div>
+
+                <hr class="section-divider">
+
                 <!-- 学生姓名 -->
                 <div class="form-group">
                     <label for="studentName" class="form-label">
@@ -124,8 +200,11 @@
                     <button id="copyBtn" class="btn btn-export">
                         📋 复制内容
                     </button>
-                    <button id="saveBtn" class="btn btn-export">
+                    <button id="saveTxtBtn" class="btn btn-export">
                         💾 保存为TXT
+                    </button>
+                    <button id="saveDocxBtn" class="btn btn-export">
+                        📝 保存为DOCX
                     </button>
                     <button id="printBtn" class="btn btn-export">
                         🖨️ 打印
